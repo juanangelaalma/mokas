@@ -1,0 +1,269 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTH & TENANT ENTITIES
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenants UserTenant[]
+
+  @@map("users")
+}
+
+model Tenant {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  address         String?
+  phone           String?
+  email           String?
+  taxId           String?
+  fiscalYearStart Int      @default(1)
+  currency        String   @default("IDR")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users          UserTenant[]
+  accounts       Account[]
+  transactions   Transaction[]
+  journalEntries JournalEntry[]
+  contacts       Contact[]
+
+  @@map("tenants")
+}
+
+model UserTenant {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      Role     @default(MEMBER)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("user_tenants")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// ============================================
+// CHART OF ACCOUNTS
+// ============================================
+
+model Account {
+  id            String        @id @default(cuid())
+  tenantId      String
+  code          String
+  name          String
+  type          AccountType
+  normalBalance NormalBalance
+  parentId      String?
+  description   String?
+  isActive      Boolean       @default(true)
+  isSystem      Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   Account?      @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children Account[]     @relation("AccountHierarchy")
+  lines    JournalLine[]
+
+  transactionsAsPayment  Transaction[] @relation("PaymentAccount")
+  transactionsAsCategory Transaction[] @relation("CategoryAccount")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, isActive])
+  @@map("accounts")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+// ============================================
+// CONTACTS
+// ============================================
+
+model Contact {
+  id        String      @id @default(cuid())
+  tenantId  String
+  name      String
+  type      ContactType
+  email     String?
+  phone     String?
+  address   String?
+  taxId     String?
+  notes     String?
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@map("contacts")
+}
+
+enum ContactType {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+}
+
+// ============================================
+// TRANSACTIONS
+// ============================================
+
+model Transaction {
+  id                String            @id @default(cuid())
+  tenantId          String
+  transactionNumber String
+  date              DateTime          @db.Date
+  type              TransactionType
+  description       String
+  amount            Decimal           @db.Decimal(15, 2)
+  paymentAccountId  String
+  categoryAccountId String
+  contactId         String?
+  referenceNumber   String?
+  status            TransactionStatus @default(POSTED)
+  notes             String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         String?
+
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  paymentAccount  Account       @relation("PaymentAccount", fields: [paymentAccountId], references: [id])
+  categoryAccount Account       @relation("CategoryAccount", fields: [categoryAccountId], references: [id])
+  contact         Contact?      @relation(fields: [contactId], references: [id])
+  journalEntry    JournalEntry?
+
+  @@unique([tenantId, transactionNumber])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([tenantId, type])
+  @@index([tenantId, status])
+  @@index([tenantId, contactId])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  CASH_IN
+  CASH_OUT
+  BANK_IN
+  BANK_OUT
+  RECEIVABLE
+  RECEIVABLE_PAYMENT
+  PAYABLE
+  PAYABLE_PAYMENT
+  TRANSFER
+}
+
+enum TransactionStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+// ============================================
+// JOURNAL ENTRIES
+// ============================================
+
+model JournalEntry {
+  id            String   @id @default(cuid())
+  tenantId      String
+  entryNumber   String
+  transactionId String?  @unique
+  date          DateTime @db.Date
+  description   String
+  isManual      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+  lines       JournalLine[]
+
+  @@unique([tenantId, entryNumber])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             String  @id @default(cuid())
+  journalEntryId String
+  accountId      String
+  description    String?
+  debit          Decimal @default(0) @db.Decimal(15, 2)
+  credit         Decimal @default(0) @db.Decimal(15, 2)
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id])
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  oldData    Json?
+  newData    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

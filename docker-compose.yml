@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  mokas-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mokas-app
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://mokas:mokas_secret@mokas-db:5432/mokas_db?schema=public
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-mokas-dev-secret-key-change-in-production-minimum-32-characters}
+      - NEXTAUTH_URL=http://localhost:3000
+      - NODE_ENV=production
+    depends_on:
+      mokas-db:
+        condition: service_healthy
+    networks:
+      - mokas-network
+    restart: unless-stopped
+
+  mokas-db:
+    image: postgres:15-alpine
+    container_name: mokas-db
+    environment:
+      - POSTGRES_USER=mokas
+      - POSTGRES_PASSWORD=mokas_secret
+      - POSTGRES_DB=mokas_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mokas-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mokas -d mokas_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  mokas-network:
+    driver: bridge
+
+volumes:
+  pgdata:
