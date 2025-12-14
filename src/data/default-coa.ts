@@ -19,7 +19,7 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
   { code: '1-1002', name: 'Bank BCA', type: 'ASSET', normalBalance: 'DEBIT', parentCode: '1-1000' },
   { code: '1-1003', name: 'Bank Mandiri', type: 'ASSET', normalBalance: 'DEBIT', parentCode: '1-1000' },
   { code: '1-1100', name: 'Piutang Usaha', type: 'ASSET', normalBalance: 'DEBIT', parentCode: '1-1000', isSystem: true },
-  { code: '1-1200', name: 'Persediaan Barang', type: 'ASSET', normalBalance: 'DEBIT', parentCode: '1-1000' },
+  { code: '1-1200', name: 'Persediaan Barang', type: 'ASSET', normalBalance: 'DEBIT', parentCode: '1-1000', isSystem: true },
 
   // Aset Tetap
   { code: '1-2000', name: 'Aset Tetap', type: 'ASSET', normalBalance: 'DEBIT', parentCode: '1-0000' },
@@ -49,7 +49,8 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
   // PENDAPATAN (4xxx)
   { code: '4-0000', name: 'Pendapatan', type: 'REVENUE', normalBalance: 'CREDIT', isSystem: true },
   { code: '4-1001', name: 'Pendapatan Penjualan', type: 'REVENUE', normalBalance: 'CREDIT', parentCode: '4-0000', isSystem: true },
-  { code: '4-1002', name: 'Pendapatan Jasa', type: 'REVENUE', normalBalance: 'CREDIT', parentCode: '4-0000' },
+  { code: '4-1002', name: 'Retur Penjualan', type: 'REVENUE', normalBalance: 'DEBIT', parentCode: '4-0000', isSystem: true },
+  { code: '4-1003', name: 'Pendapatan Jasa', type: 'REVENUE', normalBalance: 'CREDIT', parentCode: '4-0000' },
   { code: '4-2001', name: 'Pendapatan Lain-lain', type: 'REVENUE', normalBalance: 'CREDIT', parentCode: '4-0000' },
 
   // BEBAN (5xxx)
@@ -57,7 +58,7 @@ export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
 
   // HPP
   { code: '5-1000', name: 'Harga Pokok Penjualan', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '5-0000' },
-  { code: '5-1001', name: 'HPP - Pembelian Barang', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '5-1000' },
+  { code: '5-1001', name: 'Harga Pokok Penjualan', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '5-1000', isSystem: true },
 
   // Beban Operasional
   { code: '5-2000', name: 'Beban Operasional', type: 'EXPENSE', normalBalance: 'DEBIT', parentCode: '5-0000' },

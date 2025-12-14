@@ -6,9 +6,26 @@ import { cn } from '@/lib/utils';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Transaksi', href: '/dashboard/transactions', icon: TransactionIcon },
-  { name: 'Akun', href: '/dashboard/accounts', icon: AccountIcon },
+  {
+    name: 'Penjualan',
+    icon: SaleIcon,
+    children: [
+      { name: 'Daftar Penjualan', href: '/dashboard/sales' },
+      { name: 'Buat Penjualan', href: '/dashboard/sales/new' },
+    ],
+  },
+  {
+    name: 'Pembelian',
+    icon: PurchaseIcon,
+    children: [
+      { name: 'Daftar Pembelian', href: '/dashboard/purchases' },
+      { name: 'Buat Pembelian', href: '/dashboard/purchases/new' },
+    ],
+  },
+  { name: 'Produk', href: '/dashboard/products', icon: ProductIcon },
   { name: 'Kontak', href: '/dashboard/contacts', icon: ContactIcon },
+  { name: 'Transaksi Lain', href: '/dashboard/transactions', icon: TransactionIcon },
+  { name: 'Akun', href: '/dashboard/accounts', icon: AccountIcon },
   {
     name: 'Laporan',
     icon: ReportIcon,
@@ -35,9 +52,13 @@ export function Sidebar() {
       <nav className="p-4 space-y-1">
         {navigation.map((item) => {
           if (item.children) {
+            const isActive = item.children.some((child) => pathname.startsWith(child.href));
             return (
               <div key={item.name} className="space-y-1">
-                <div className="flex items-center px-3 py-2 text-sm font-medium text-gray-600">
+                <div className={cn(
+                  'flex items-center px-3 py-2 text-sm font-medium rounded-lg',
+                  isActive ? 'text-primary-700 bg-primary-50' : 'text-gray-600'
+                )}>
                   <item.icon className="w-5 h-5 mr-3" />
                   {item.name}
                 </div>
@@ -49,7 +70,7 @@ export function Sidebar() {
                       className={cn(
                         'block px-3 py-2 text-sm rounded-lg transition-colors',
                         pathname === child.href
-                          ? 'bg-primary-50 text-primary-700 font-medium'
+                          ? 'bg-primary-100 text-primary-700 font-medium'
                           : 'text-gray-600 hover:bg-gray-100'
                       )}
                     >
@@ -67,7 +88,7 @@ export function Sidebar() {
               href={item.href!}
               className={cn(
                 'flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                pathname === item.href
+                pathname === item.href || pathname.startsWith(item.href + '/')
                   ? 'bg-primary-50 text-primary-700'
                   : 'text-gray-600 hover:bg-gray-100'
               )}
@@ -90,6 +111,38 @@ function HomeIcon({ className }: { className?: string }) {
   );
 }
 
+function SaleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+    </svg>
+  );
+}
+
+function PurchaseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  );
+}
+
+function ProductIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    </svg>
+  );
+}
+
+function ContactIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  );
+}
+
 function TransactionIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,14 +155,6 @@ function AccountIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-    </svg>
-  );
-}
-
-function ContactIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
     </svg>
   );
 }

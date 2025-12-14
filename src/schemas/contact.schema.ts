@@ -9,6 +9,17 @@ export const createContactSchema = z.object({
   address: z.string().max(500, 'Alamat maksimal 500 karakter').optional().nullable(),
   taxId: z.string().max(30, 'NPWP maksimal 30 karakter').optional().nullable(),
   notes: z.string().optional().nullable(),
+  creditLimit: z
+    .number()
+    .min(0, 'Kredit limit tidak boleh negatif')
+    .default(0)
+    .or(z.string().transform((val) => parseFloat(val) || 0)),
+  paymentTermDays: z
+    .number()
+    .int()
+    .min(0, 'Jangka waktu pembayaran tidak boleh negatif')
+    .default(0)
+    .or(z.string().transform((val) => parseInt(val) || 0)),
   isActive: z.boolean().default(true),
 });
 

@@ -37,11 +37,19 @@ model Tenant {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  users          UserTenant[]
-  accounts       Account[]
-  transactions   Transaction[]
-  journalEntries JournalEntry[]
-  contacts       Contact[]
+  users           UserTenant[]
+  accounts        Account[]
+  transactions    Transaction[]
+  journalEntries  JournalEntry[]
+  contacts        Contact[]
+  products        Product[]
+  inventoryLayers InventoryLayer[]
+  sales           Sale[]
+  salePayments    SalePayment[]
+  saleReturns     SaleReturn[]
+  purchases       Purchase[]
+  purchasePayments PurchasePayment[]
+  purchaseReturns PurchaseReturn[]
 
   @@map("tenants")
 }
@@ -96,6 +104,20 @@ model Account {
   transactionsAsPayment  Transaction[] @relation("PaymentAccount")
   transactionsAsCategory Transaction[] @relation("CategoryAccount")
 
+  // Product account relations
+  productsAsInventory Product[] @relation("ProductInventoryAccount")
+  productsAsCogs      Product[] @relation("ProductCogsAccount")
+  productsAsRevenue   Product[] @relation("ProductRevenueAccount")
+  productsAsPurchase  Product[] @relation("ProductPurchaseAccount")
+
+  // Payment account relations
+  salePayments     SalePayment[]     @relation("SalePaymentAccount")
+  purchasePayments PurchasePayment[] @relation("PurchasePaymentAccount")
+
+  // Refund account relations
+  saleReturnRefunds     SaleReturn[]     @relation("SaleReturnRefundAccount")
+  purchaseReturnRefunds PurchaseReturn[] @relation("PurchaseReturnRefundAccount")
+
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, type])
@@ -117,26 +139,35 @@ enum NormalBalance {
 }
 
 // ============================================
-// CONTACTS
+// CONTACTS (Customer & Vendor)
 // ============================================
 
 model Contact {
-  id        String      @id @default(cuid())
-  tenantId  String
-  name      String
-  type      ContactType
-  email     String?
-  phone     String?
-  address   String?
-  taxId     String?
-  notes     String?
-  isActive  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  tenantId        String
+  code            String
+  name            String
+  type            ContactType
+  email           String?
+  phone           String?
+  address         String?
+  taxId           String?
+  notes           String?
+
+  // Credit & Payment Terms
+  creditLimit     Decimal     @default(0) @db.Decimal(15, 2)
+  paymentTermDays Int         @default(0)
+
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+  sales        Sale[]
+  purchases    Purchase[]
 
+  @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, type])
   @@map("contacts")
@@ -144,12 +175,463 @@ model Contact {
 
 enum ContactType {
   CUSTOMER
-  SUPPLIER
+  VENDOR
   BOTH
 }
 
 // ============================================
-// TRANSACTIONS
+// PRODUCTS (Inventory & Service)
+// ============================================
+
+model Product {
+  id                  String      @id @default(cuid())
+  tenantId            String
+  sku                 String
+  name                String
+  description         String?
+  type                ProductType @default(INVENTORY)
+  unit                String      @default("pcs")
+
+  // Pricing
+  purchasePrice       Decimal     @db.Decimal(15, 2)
+  sellingPrice        Decimal     @db.Decimal(15, 2)
+
+  // Stock settings
+  trackStock          Boolean     @default(true)
+  minStock            Int         @default(0)
+
+  // Linked Accounts
+  inventoryAccountId  String?
+  cogsAccountId       String?
+  revenueAccountId    String?
+  purchaseAccountId   String?
+
+  isActive            Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  inventoryAccount  Account?  @relation("ProductInventoryAccount", fields: [inventoryAccountId], references: [id])
+  cogsAccount       Account?  @relation("ProductCogsAccount", fields: [cogsAccountId], references: [id])
+  revenueAccount    Account?  @relation("ProductRevenueAccount", fields: [revenueAccountId], references: [id])
+  purchaseAccount   Account?  @relation("ProductPurchaseAccount", fields: [purchaseAccountId], references: [id])
+
+  inventoryLayers   InventoryLayer[]
+  saleItems         SaleItem[]
+  purchaseItems     PurchaseItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@map("products")
+}
+
+enum ProductType {
+  INVENTORY
+  SERVICE
+}
+
+// ============================================
+// INVENTORY LAYERS (FIFO)
+// ============================================
+
+model InventoryLayer {
+  id              String   @id @default(cuid())
+  tenantId        String
+  productId       String
+
+  // Source reference
+  sourceType      String   // PURCHASE, RETURN, OPENING, ADJUSTMENT
+  sourceId        String?
+
+  // FIFO data
+  quantity        Int
+  remainingQty    Int
+  unitCost        Decimal  @db.Decimal(15, 2)
+  totalCost       Decimal  @db.Decimal(15, 2)
+
+  receivedDate    DateTime @db.Date
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id])
+  cogsDetails     CostOfGoodsDetail[]
+  purchaseItem    PurchaseItem?
+
+  @@index([tenantId, productId])
+  @@index([tenantId, productId, remainingQty])
+  @@map("inventory_layers")
+}
+
+// ============================================
+// SALES
+// ============================================
+
+model Sale {
+  id              String      @id @default(cuid())
+  tenantId        String
+  saleNumber      String
+
+  contactId       String
+
+  saleDate        DateTime    @db.Date
+  dueDate         DateTime    @db.Date
+
+  paymentType     PaymentType @default(CREDIT)
+
+  subtotal        Decimal     @db.Decimal(15, 2)
+  discountAmount  Decimal     @default(0) @db.Decimal(15, 2)
+  taxAmount       Decimal     @default(0) @db.Decimal(15, 2)
+  totalAmount     Decimal     @db.Decimal(15, 2)
+
+  paidAmount      Decimal     @default(0) @db.Decimal(15, 2)
+
+  status          DocumentStatus @default(UNPAID)
+
+  notes           String?
+
+  // Journal references
+  revenueJournalId  String?   @unique
+  cogsJournalId     String?   @unique
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  createdBy       String?
+
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact         Contact       @relation(fields: [contactId], references: [id])
+  revenueJournal  JournalEntry? @relation("SaleRevenueJournal", fields: [revenueJournalId], references: [id])
+  cogsJournal     JournalEntry? @relation("SaleCogsJournal", fields: [cogsJournalId], references: [id])
+
+  items           SaleItem[]
+  payments        SalePayment[]
+  returns         SaleReturn[]
+
+  @@unique([tenantId, saleNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, contactId])
+  @@index([tenantId, dueDate])
+  @@map("sales")
+}
+
+model SaleItem {
+  id              String  @id @default(cuid())
+  saleId          String
+  productId       String
+
+  description     String
+  quantity        Int
+  unitPrice       Decimal @db.Decimal(15, 2)
+  discountPercent Decimal @default(0) @db.Decimal(5, 2)
+  amount          Decimal @db.Decimal(15, 2)
+
+  // COGS tracking
+  totalCogs       Decimal @default(0) @db.Decimal(15, 2)
+
+  // Return tracking
+  returnedQty     Int     @default(0)
+
+  sale            Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product         Product   @relation(fields: [productId], references: [id])
+  cogsDetails     CostOfGoodsDetail[]
+  returnItems     SaleReturnItem[]
+
+  @@index([saleId])
+  @@map("sale_items")
+}
+
+// COGS Detail - tracks which inventory layers were consumed
+model CostOfGoodsDetail {
+  id                String  @id @default(cuid())
+  saleItemId        String
+  inventoryLayerId  String
+
+  quantity          Int
+  unitCost          Decimal @db.Decimal(15, 2)
+  totalCost         Decimal @db.Decimal(15, 2)
+
+  // For return tracking
+  returnedQty       Int     @default(0)
+
+  createdAt         DateTime @default(now())
+
+  saleItem          SaleItem       @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  inventoryLayer    InventoryLayer @relation(fields: [inventoryLayerId], references: [id])
+
+  @@index([saleItemId])
+  @@index([inventoryLayerId])
+  @@map("cogs_details")
+}
+
+// ============================================
+// SALE PAYMENTS
+// ============================================
+
+model SalePayment {
+  id                String   @id @default(cuid())
+  tenantId          String
+  paymentNumber     String
+  saleId            String
+
+  paymentDate       DateTime @db.Date
+  amount            Decimal  @db.Decimal(15, 2)
+  paymentMethod     String
+  paymentAccountId  String
+
+  notes             String?
+
+  journalEntryId    String?  @unique
+
+  createdAt         DateTime @default(now())
+  createdBy         String?
+
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sale              Sale         @relation(fields: [saleId], references: [id])
+  paymentAccount    Account      @relation("SalePaymentAccount", fields: [paymentAccountId], references: [id])
+  journalEntry      JournalEntry? @relation("SalePaymentJournal", fields: [journalEntryId], references: [id])
+
+  @@unique([tenantId, paymentNumber])
+  @@index([tenantId, saleId])
+  @@map("sale_payments")
+}
+
+// ============================================
+// SALE RETURNS
+// ============================================
+
+model SaleReturn {
+  id                String     @id @default(cuid())
+  tenantId          String
+  returnNumber      String
+  saleId            String
+
+  returnDate        DateTime   @db.Date
+  reason            String?
+
+  subtotal          Decimal    @db.Decimal(15, 2)
+  totalAmount       Decimal    @db.Decimal(15, 2)
+
+  refundType        RefundType @default(CREDIT_NOTE)
+  refundAccountId   String?
+
+  // Journal references
+  revenueJournalId  String?    @unique
+  cogsJournalId     String?    @unique
+
+  createdAt         DateTime   @default(now())
+  createdBy         String?
+
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sale              Sale         @relation(fields: [saleId], references: [id])
+  refundAccount     Account?     @relation("SaleReturnRefundAccount", fields: [refundAccountId], references: [id])
+  revenueJournal    JournalEntry? @relation("SaleReturnRevenueJournal", fields: [revenueJournalId], references: [id])
+  cogsJournal       JournalEntry? @relation("SaleReturnCogsJournal", fields: [cogsJournalId], references: [id])
+
+  items             SaleReturnItem[]
+
+  @@unique([tenantId, returnNumber])
+  @@index([tenantId, saleId])
+  @@map("sale_returns")
+}
+
+model SaleReturnItem {
+  id              String     @id @default(cuid())
+  saleReturnId    String
+  saleItemId      String
+  productId       String
+
+  quantity        Int
+  unitPrice       Decimal    @db.Decimal(15, 2)
+  amount          Decimal    @db.Decimal(15, 2)
+
+  cogsAmount      Decimal    @default(0) @db.Decimal(15, 2)
+
+  saleReturn      SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItem        SaleItem   @relation(fields: [saleItemId], references: [id])
+
+  @@index([saleReturnId])
+  @@map("sale_return_items")
+}
+
+// ============================================
+// PURCHASES
+// ============================================
+
+model Purchase {
+  id              String         @id @default(cuid())
+  tenantId        String
+  purchaseNumber  String
+
+  contactId       String
+
+  purchaseDate    DateTime       @db.Date
+  dueDate         DateTime       @db.Date
+
+  paymentType     PaymentType    @default(CREDIT)
+
+  subtotal        Decimal        @db.Decimal(15, 2)
+  discountAmount  Decimal        @default(0) @db.Decimal(15, 2)
+  taxAmount       Decimal        @default(0) @db.Decimal(15, 2)
+  totalAmount     Decimal        @db.Decimal(15, 2)
+
+  paidAmount      Decimal        @default(0) @db.Decimal(15, 2)
+
+  status          DocumentStatus @default(UNPAID)
+
+  notes           String?
+
+  journalEntryId  String?        @unique
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdBy       String?
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact         Contact          @relation(fields: [contactId], references: [id])
+  journalEntry    JournalEntry?    @relation("PurchaseJournal", fields: [journalEntryId], references: [id])
+
+  items           PurchaseItem[]
+  payments        PurchasePayment[]
+  returns         PurchaseReturn[]
+
+  @@unique([tenantId, purchaseNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, contactId])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id                String  @id @default(cuid())
+  purchaseId        String
+  productId         String
+
+  description       String
+  quantity          Int
+  unitCost          Decimal @db.Decimal(15, 2)
+  amount            Decimal @db.Decimal(15, 2)
+
+  returnedQty       Int     @default(0)
+
+  inventoryLayerId  String? @unique
+
+  purchase          Purchase        @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product           Product         @relation(fields: [productId], references: [id])
+  inventoryLayer    InventoryLayer? @relation(fields: [inventoryLayerId], references: [id])
+  returnItems       PurchaseReturnItem[]
+
+  @@index([purchaseId])
+  @@map("purchase_items")
+}
+
+// ============================================
+// PURCHASE PAYMENTS
+// ============================================
+
+model PurchasePayment {
+  id                String   @id @default(cuid())
+  tenantId          String
+  paymentNumber     String
+  purchaseId        String
+
+  paymentDate       DateTime @db.Date
+  amount            Decimal  @db.Decimal(15, 2)
+  paymentMethod     String
+  paymentAccountId  String
+
+  notes             String?
+
+  journalEntryId    String?  @unique
+
+  createdAt         DateTime @default(now())
+  createdBy         String?
+
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchase          Purchase      @relation(fields: [purchaseId], references: [id])
+  paymentAccount    Account       @relation("PurchasePaymentAccount", fields: [paymentAccountId], references: [id])
+  journalEntry      JournalEntry? @relation("PurchasePaymentJournal", fields: [journalEntryId], references: [id])
+
+  @@unique([tenantId, paymentNumber])
+  @@index([tenantId, purchaseId])
+  @@map("purchase_payments")
+}
+
+// ============================================
+// PURCHASE RETURNS
+// ============================================
+
+model PurchaseReturn {
+  id                String     @id @default(cuid())
+  tenantId          String
+  returnNumber      String
+  purchaseId        String
+
+  returnDate        DateTime   @db.Date
+  reason            String?
+
+  subtotal          Decimal    @db.Decimal(15, 2)
+  totalAmount       Decimal    @db.Decimal(15, 2)
+
+  refundType        RefundType @default(CREDIT_NOTE)
+  refundAccountId   String?
+
+  journalEntryId    String?    @unique
+
+  createdAt         DateTime   @default(now())
+  createdBy         String?
+
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchase          Purchase      @relation(fields: [purchaseId], references: [id])
+  refundAccount     Account?      @relation("PurchaseReturnRefundAccount", fields: [refundAccountId], references: [id])
+  journalEntry      JournalEntry? @relation("PurchaseReturnJournal", fields: [journalEntryId], references: [id])
+
+  items             PurchaseReturnItem[]
+
+  @@unique([tenantId, returnNumber])
+  @@index([tenantId, purchaseId])
+  @@map("purchase_returns")
+}
+
+model PurchaseReturnItem {
+  id                String         @id @default(cuid())
+  purchaseReturnId  String
+  purchaseItemId    String
+  productId         String
+
+  quantity          Int
+  unitCost          Decimal        @db.Decimal(15, 2)
+  amount            Decimal        @db.Decimal(15, 2)
+
+  purchaseReturn    PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  purchaseItem      PurchaseItem   @relation(fields: [purchaseItemId], references: [id])
+
+  @@index([purchaseReturnId])
+  @@map("purchase_return_items")
+}
+
+// ============================================
+// COMMON ENUMS
+// ============================================
+
+enum PaymentType {
+  CASH
+  CREDIT
+}
+
+enum DocumentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum RefundType {
+  CREDIT_NOTE
+  CASH_REFUND
+}
+
+// ============================================
+// SIMPLE TRANSACTIONS (existing)
 // ============================================
 
 model Transaction {
@@ -222,6 +704,16 @@ model JournalEntry {
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transaction Transaction? @relation(fields: [transactionId], references: [id])
   lines       JournalLine[]
+
+  // Business document relations
+  saleRevenue       Sale?           @relation("SaleRevenueJournal")
+  saleCogs          Sale?           @relation("SaleCogsJournal")
+  salePayment       SalePayment?    @relation("SalePaymentJournal")
+  saleReturnRevenue SaleReturn?     @relation("SaleReturnRevenueJournal")
+  saleReturnCogs    SaleReturn?     @relation("SaleReturnCogsJournal")
+  purchase          Purchase?       @relation("PurchaseJournal")
+  purchasePayment   PurchasePayment? @relation("PurchasePaymentJournal")
+  purchaseReturn    PurchaseReturn? @relation("PurchaseReturnJournal")
 
   @@unique([tenantId, entryNumber])
   @@index([tenantId])

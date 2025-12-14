@@ -78,7 +78,7 @@ export default function AccountsPage() {
         <div className="text-center py-10">Memuat...</div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(groupedAccounts).map(([type, typeAccounts]) => (
+          {(Object.entries(groupedAccounts) as [string, any[]][]).map(([type, typeAccounts]) => (
             <Card key={type}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

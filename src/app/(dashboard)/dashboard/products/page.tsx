@@ -7,25 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
 
-const typeLabels: Record<string, string> = {
-  CUSTOMER: 'Pelanggan',
-  VENDOR: 'Supplier',
-  BOTH: 'Keduanya',
-};
-
-export default function ContactsPage() {
-  const [contacts, setContacts] = useState<any[]>([]);
+export default function ProductsPage() {
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('ALL');
 
-  const fetchContacts = async () => {
+  const fetchProducts = async () => {
     setLoading(true);
     try {
-      const url = filter === 'ALL' ? '/api/contacts' : `/api/contacts?type=${filter}`;
+      const url = filter === 'ALL' ? '/api/products' : `/api/products?type=${filter}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
-        setContacts(data.data);
+        setProducts(data.data);
       }
     } catch (err) {
       console.error(err);
@@ -35,81 +29,85 @@ export default function ContactsPage() {
   };
 
   useEffect(() => {
-    fetchContacts();
+    fetchProducts();
   }, [filter]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Kontak</h1>
-        <Link href="/dashboard/contacts/new">
-          <Button>+ Tambah Kontak</Button>
+        <h1 className="text-2xl font-bold text-gray-900">Produk</h1>
+        <Link href="/dashboard/products/new">
+          <Button>+ Tambah Produk</Button>
         </Link>
       </div>
 
       <div className="flex gap-2">
-        {['ALL', 'CUSTOMER', 'VENDOR'].map((type) => (
+        {['ALL', 'INVENTORY', 'SERVICE'].map((type) => (
           <Button
             key={type}
             variant={filter === type ? 'primary' : 'outline'}
             size="sm"
             onClick={() => setFilter(type)}
           >
-            {type === 'ALL' ? 'Semua' : typeLabels[type]}
+            {type === 'ALL' ? 'Semua' : type === 'INVENTORY' ? 'Barang' : 'Jasa'}
           </Button>
         ))}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Daftar Kontak</CardTitle>
+          <CardTitle>Daftar Produk</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-10">Memuat...</div>
-          ) : contacts.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="text-center py-10 text-gray-500">
-              Belum ada kontak.{' '}
-              <Link href="/dashboard/contacts/new" className="text-primary-600 hover:underline">
-                Tambah kontak pertama
+              Belum ada produk.{' '}
+              <Link href="/dashboard/products/new" className="text-primary-600 hover:underline">
+                Tambah produk pertama
               </Link>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Kode</TableHead>
+                  <TableHead>SKU</TableHead>
                   <TableHead>Nama</TableHead>
                   <TableHead>Tipe</TableHead>
-                  <TableHead>Telepon</TableHead>
-                  <TableHead className="text-right">Kredit Limit</TableHead>
-                  <TableHead className="text-right">TOP (Hari)</TableHead>
+                  <TableHead className="text-right">Harga Beli</TableHead>
+                  <TableHead className="text-right">Harga Jual</TableHead>
+                  <TableHead className="text-right">Stok</TableHead>
+                  <TableHead className="text-right">Nilai Stok</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contacts.map((contact) => (
-                  <TableRow key={contact.id}>
-                    <TableCell className="font-mono">{contact.code}</TableCell>
+                {products.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-mono">{product.sku}</TableCell>
                     <TableCell>
-                      <Link href={`/dashboard/contacts/${contact.id}`} className="text-primary-600 hover:underline">
-                        {contact.name}
+                      <Link href={`/dashboard/products/${product.id}`} className="text-primary-600 hover:underline">
+                        {product.name}
                       </Link>
                     </TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        contact.type === 'CUSTOMER' ? 'bg-green-50 text-green-600' :
-                        contact.type === 'VENDOR' ? 'bg-blue-50 text-blue-600' :
-                        'bg-purple-50 text-purple-600'
+                        product.type === 'INVENTORY' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
                       }`}>
-                        {typeLabels[contact.type]}
+                        {product.type === 'INVENTORY' ? 'Barang' : 'Jasa'}
                       </span>
                     </TableCell>
-                    <TableCell>{contact.phone || '-'}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(product.purchasePrice)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(product.sellingPrice)}</TableCell>
                     <TableCell className="text-right">
-                      {contact.creditLimit > 0 ? formatCurrency(contact.creditLimit) : '-'}
+                      {product.currentStock !== null ? (
+                        <span className={product.currentStock <= product.minStock ? 'text-red-600 font-medium' : ''}>
+                          {product.currentStock} {product.unit}
+                        </span>
+                      ) : '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {contact.paymentTermDays > 0 ? `NET ${contact.paymentTermDays}` : 'COD'}
+                      {product.stockValue !== null ? formatCurrency(product.stockValue) : '-'}
                     </TableCell>
                   </TableRow>
                 ))}
