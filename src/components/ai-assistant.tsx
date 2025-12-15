@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Markdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -107,7 +108,7 @@ export function AIAssistant() {
   };
 
   return (
-    <Card className="flex flex-col h-[600px] max-h-[600px]">
+    <Card className="flex flex-col h-auto min-h-[500px]">
       <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
           <svg
@@ -141,7 +142,9 @@ export function AIAssistant() {
                     : 'bg-gray-100 text-gray-900'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <Markdown>  
+                  {message.content}
+                </Markdown>
                 <p className="text-xs mt-1 opacity-70">
                   {message.timestamp.toLocaleTimeString('id-ID', {
                     hour: '2-digit',
