@@ -16,9 +16,7 @@ async function getAccountByCode(
   tenantId: string,
   code: string
 ) {
-  console.log(code, tenantId)
   const accounts = await tx.account.findMany()
-  console.log(accounts.flatMap((account) => account.code + " " + account.name))
   const account = await tx.account.findFirst({
     where: { tenantId, code },
   });
