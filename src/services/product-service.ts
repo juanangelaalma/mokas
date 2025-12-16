@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import Decimal from 'decimal.js';
 import { CreateProductInput, UpdateProductInput } from '@/schemas/product.schema';
 import { ProductType } from '@prisma/client';
+import { embedProduct, removeProductEmbedding } from '@/lib/vector';
 
 export class ProductService {
   async getAll(tenantId: string, type?: ProductType) {
@@ -88,7 +89,7 @@ export class ProductService {
       where: { tenantId, code: '4-1001' },
     });
 
-    return prisma.product.create({
+    const product = await prisma.product.create({
       data: {
         tenantId,
         sku: input.sku,
@@ -106,6 +107,11 @@ export class ProductService {
         isActive: input.isActive,
       },
     });
+
+    // Index product to vector store (background)
+    embedProduct(product, tenantId).catch(console.error);
+
+    return product;
   }
 
   async update(tenantId: string, id: string, input: UpdateProductInput) {
@@ -122,7 +128,7 @@ export class ProductService {
       if (existing) throw new Error('SKU sudah digunakan');
     }
 
-    return prisma.product.update({
+    const updated = await prisma.product.update({
       where: { id },
       data: {
         sku: input.sku,
@@ -136,6 +142,11 @@ export class ProductService {
         isActive: input.isActive,
       },
     });
+
+    // Re-index product to vector store (background)
+    embedProduct(updated, tenantId).catch(console.error);
+
+    return updated;
   }
 
   async delete(tenantId: string, id: string) {
@@ -152,7 +163,12 @@ export class ProductService {
       throw new Error('Produk tidak dapat dihapus karena memiliki transaksi');
     }
 
-    return prisma.product.delete({ where: { id } });
+    const deleted = await prisma.product.delete({ where: { id } });
+
+    // Remove product from vector store (background)
+    removeProductEmbedding(id).catch(console.error);
+
+    return deleted;
   }
 
   async getInventoryLayers(tenantId: string, productId: string) {

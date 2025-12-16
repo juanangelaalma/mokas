@@ -40,9 +40,22 @@ services:
       retries: 5
     restart: unless-stopped
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mokas-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    networks:
+      - mokas-network
+    restart: unless-stopped
+
 networks:
   mokas-network:
     driver: bridge
 
 volumes:
   pgdata:
+  qdrant_storage:

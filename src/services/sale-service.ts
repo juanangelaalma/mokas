@@ -5,6 +5,7 @@ import { consumeInventoryFIFO, restoreInventoryFromReturn, calculateReturnCogs }
 import { generateSaleJournals, generateSalePaymentJournal, generateSaleReturnJournals } from './business-journal-service';
 import { validateCreditLimit, validateStockAvailability, validateSaleReturn } from '@/domain/sales/validators';
 import { calculateDueDate, validatePayment } from '@/domain/common/payment-handler';
+import { embedSale } from '@/lib/vector';
 
 export class SaleService {
   // ============================================
@@ -228,15 +229,24 @@ export class SaleService {
       });
 
       // 10. Link journals to sale
-      await tx.sale.update({
+      const updatedSale = await tx.sale.update({
         where: { id: sale.id },
         data: {
           revenueJournalId,
           cogsJournalId,
         },
+        include: {
+          contact: true,
+          items: { include: { product: true } },
+        },
       });
 
-      return sale;
+      // Index sale to vector store (background, after transaction)
+      setImmediate(() => {
+        embedSale(updatedSale, tenantId).catch(console.error);
+      });
+
+      return updatedSale;
     });
   }
 
