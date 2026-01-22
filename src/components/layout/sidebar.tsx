@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
@@ -42,6 +43,13 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+  const toggleItem = (name: string) => {
+    setExpandedItems((prev) =>
+      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
+    );
+  };
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 min-h-screen">
@@ -54,31 +62,38 @@ export function Sidebar() {
         {navigation.map((item) => {
           if (item.children) {
             const isActive = item.children.some((child) => pathname.startsWith(child.href));
+            const isExpanded = expandedItems.includes(item.name);
             return (
               <div key={item.name} className="space-y-1">
-                <div className={cn(
-                  'flex items-center px-3 py-2 text-sm font-medium rounded-lg',
-                  isActive ? 'text-primary-700 bg-primary-50' : 'text-gray-600'
-                )}>
+                <button
+                  onClick={() => toggleItem(item.name)}
+                  className={cn(
+                    'flex items-center w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                    isActive ? 'text-primary-700 bg-primary-50' : 'text-gray-600'
+                  )}
+                >
                   <item.icon className="w-5 h-5 mr-3" />
                   {item.name}
-                </div>
-                <div className="ml-8 space-y-1">
-                  {item.children.map((child) => (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      className={cn(
-                        'block px-3 py-2 text-sm rounded-lg transition-colors',
-                        pathname === child.href
-                          ? 'bg-primary-100 text-primary-700 font-medium'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      )}
-                    >
-                      {child.name}
-                    </Link>
-                  ))}
-                </div>
+                  <ChevronIcon className={cn('w-4 h-4 ml-auto transition-transform', isExpanded && 'rotate-90')} />
+                </button>
+                {isExpanded && (
+                  <div className="ml-8 space-y-1 animate-accordion-down">
+                    {item.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        className={cn(
+                          'block px-3 py-2 text-sm rounded-lg transition-colors',
+                          pathname === child.href
+                            ? 'bg-primary-100 text-primary-700 font-medium'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        )}
+                      >
+                        {child.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           }
@@ -172,6 +187,14 @@ function AIIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
     </svg>
   );
 }

@@ -13,3 +13,20 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 }
+
+@keyframes accordion-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+}
+
+.animate-accordion-down {
+  animation: accordion-down 0.2s ease-out forwards;
+}
